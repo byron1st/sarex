@@ -21,20 +21,23 @@ pub fn set_db(db_url: String) -> Result<(), Box<dyn Error>> {
 pub fn get_db() -> Result<(), Box<dyn Error>> {
     let config = read_config()?;
 
+    let mut s = String::new();
+
     if config.db_url != "" {
-        println!("    db_url: {}", config.db_url);
+        s.push_str(&format!("    db_url: {}\n", config.db_url));
     } else {
-        println!("    db_url: <NOT SET>");
+        s.push_str("    db_url: <NOT SET>\n");
     }
 
     if let Some(project_id) = config.project_id {
-        println!("project_id: {:?}", project_id);
+        s.push_str(&format!("project_id: {:?}\n", project_id));
     } else {
-        println!("project_id: <NOT SET>");
+        s.push_str("project_id: <NOT SET>\n");
     }
 
     // TODO: Read projects if db_url is set
 
+    println!("{}", s);
     Ok(())
 }
 
