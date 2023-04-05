@@ -7,6 +7,8 @@ use mongodb::{
 use serde::{Deserialize, Serialize};
 use std::{error::Error, str::FromStr};
 
+const PROJECTS_COL: &str = "projects";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
@@ -73,7 +75,6 @@ pub async fn update_project_name(
     Ok(String::from(id))
 }
 
-const PROJECTS_COL: &str = "projects";
 async fn get_projects_col(url: &str) -> Result<Collection<Project>, Box<dyn Error>> {
     let client = get_mongo_client(url).await?;
     let db = get_default_db(&client)?;
