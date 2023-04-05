@@ -1,7 +1,7 @@
-use super::db::{get_db, set_db, set_project};
+use super::{config, model::*};
 use clap::{Parser, Subcommand};
 use log::{error, info};
-use std::error::Error;
+use std::{error::Error, fmt::Display};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -66,6 +66,23 @@ enum Commands {
     },
 }
 
+#[derive(Debug)]
+enum CmdError {
+    NotEnoughArguments,
+    NoSuchProject,
+}
+
+impl Error for CmdError {}
+
+impl Display for CmdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CmdError::NotEnoughArguments => write!(f, "Not enough arguments"),
+            CmdError::NoSuchProject => write!(f, "No such project"),
+        }
+    }
+}
+
 pub async fn init_app() {
     let cli = Cli::parse();
 
@@ -106,4 +123,85 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
             Ok(())
         }
     }
+}
+
+async fn set_db(db_url: String) -> Result<(), Box<dyn Error>> {
+    mongo::get_mongo_client(&db_url).await?; // Check if the URL is valid
+
+    let mut config = config::read()?;
+
+    config.db_url = db_url;
+
+    config::write(&config)?;
+
+    Ok(())
+}
+
+async fn get_db() -> Result<(), Box<dyn Error>> {
+    let config = config::read()?;
+
+    let mut s = String::new();
+
+    if config.db_url != "" {
+        s.push_str(&format!("db_url: {}\n", config.db_url));
+    } else {
+        s.push_str("db_url: <NOT SET>\n");
+    }
+
+    let project_id = match config.project_id {
+        Some(id) => id,
+        None => "".to_string(),
+    };
+
+    s.push_str(&format!("project_id: {}\n", &project_id));
+
+    if config.db_url != "" {
+        let projects = projects::read_many(&config.db_url).await?;
+
+        s.push_str("projects:\n");
+        for project in projects {
+            let id = match project.id {
+                Some(id) => id.to_hex(),
+                None => "".to_string(),
+            };
+            let created_at = project.created_at.to_chrono();
+            let checked = if project_id == id { "V" } else { "-" };
+
+            s.push_str(&format!(
+                "    {} {}: {}, {}\n",
+                checked,
+                id,
+                project.name,
+                created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            ));
+        }
+    }
+
+    println!("{}", s);
+    Ok(())
+}
+
+async fn set_project(
+    project_id: Option<String>,
+    name: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    let mut config = config::read()?;
+
+    let id = match (project_id, name) {
+        (Some(id), Some(name)) => projects::update(&config.db_url, &id, name).await?,
+        (Some(id), None) => match projects::read_one(&config.db_url, &id).await? {
+            Some(_) => id,
+            None => return Err(Box::new(CmdError::NoSuchProject)),
+        },
+        (None, Some(name)) => projects::create(&config.db_url, name).await?,
+        (None, None) => {
+            return Err(Box::new(CmdError::NotEnoughArguments));
+        }
+    };
+
+    config.project_id = Some(id);
+
+    config::write(&config)?;
+
+    Ok(())
 }

@@ -1,3 +1,3 @@
-pub mod cli;
-mod db;
+pub mod cmd;
+mod config;
 mod model;

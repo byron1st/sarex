@@ -17,8 +17,8 @@ pub struct Project {
     pub created_at: DateTime,
 }
 
-pub async fn create_new_project(url: &str, name: String) -> Result<String, Box<dyn Error>> {
-    let collection = get_projects_col(url).await?;
+pub async fn create(url: &str, name: String) -> Result<String, Box<dyn Error>> {
+    let collection = get_col(url).await?;
 
     let new_project = Project {
         id: None,
@@ -34,8 +34,8 @@ pub async fn create_new_project(url: &str, name: String) -> Result<String, Box<d
     }
 }
 
-pub async fn read_projects(url: &str) -> Result<Vec<Project>, Box<dyn Error>> {
-    let collection = get_projects_col(url).await?;
+pub async fn read_many(url: &str) -> Result<Vec<Project>, Box<dyn Error>> {
+    let collection = get_col(url).await?;
 
     let mut cursor = collection.find(None, None).await?;
 
@@ -47,8 +47,8 @@ pub async fn read_projects(url: &str) -> Result<Vec<Project>, Box<dyn Error>> {
     Ok(projects)
 }
 
-pub async fn read_project_by_id(url: &str, id: &str) -> Result<Option<Project>, Box<dyn Error>> {
-    let collection = get_projects_col(url).await?;
+pub async fn read_one(url: &str, id: &str) -> Result<Option<Project>, Box<dyn Error>> {
+    let collection = get_col(url).await?;
 
     let oid = ObjectId::from_str(id)?;
     let filter = doc! {"_id": oid};
@@ -59,12 +59,8 @@ pub async fn read_project_by_id(url: &str, id: &str) -> Result<Option<Project>, 
     }
 }
 
-pub async fn update_project_name(
-    url: &str,
-    id: &str,
-    name: String,
-) -> Result<String, Box<dyn Error>> {
-    let collection = get_projects_col(url).await?;
+pub async fn update(url: &str, id: &str, name: String) -> Result<String, Box<dyn Error>> {
+    let collection = get_col(url).await?;
 
     let oid = ObjectId::from_str(id)?;
     let filter = doc! {"_id": oid};
@@ -75,7 +71,7 @@ pub async fn update_project_name(
     Ok(String::from(id))
 }
 
-async fn get_projects_col(url: &str) -> Result<Collection<Project>, Box<dyn Error>> {
+async fn get_col(url: &str) -> Result<Collection<Project>, Box<dyn Error>> {
     let client = get_mongo_client(url).await?;
     let db = get_default_db(&client)?;
 
