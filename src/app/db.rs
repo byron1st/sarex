@@ -2,12 +2,17 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
     error::Error,
+    fmt::Display,
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
 };
 
-pub fn set_db(db_url: String) -> Result<(), Box<dyn Error>> {
+use super::mongo::get_mongo_client;
+
+pub async fn set_db(db_url: String) -> Result<(), Box<dyn Error>> {
+    get_mongo_client(&db_url).await?; // Check if the URL is valid
+
     let mut config = read_config()?;
 
     config.db_url = db_url;
@@ -41,10 +46,34 @@ pub fn get_db() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn set_project(project_id: String) -> Result<(), Box<dyn Error>> {
+#[derive(Debug)]
+enum DBError {
+    NotEnoughArguments,
+}
+
+impl Error for DBError {}
+
+impl Display for DBError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DBError::NotEnoughArguments => write!(f, "Not enough arguments"),
+        }
+    }
+}
+
+pub fn set_project(project_id: Option<String>, name: Option<String>) -> Result<(), Box<dyn Error>> {
     let mut config = read_config()?;
 
-    config.project_id = Some(project_id);
+    let id = match (project_id, name) {
+        (Some(id), Some(name)) => id,
+        (Some(id), None) => id,
+        (None, Some(name)) => String::from("TODO: Get project id from name"),
+        (None, None) => {
+            return Err(Box::new(DBError::NotEnoughArguments));
+        }
+    };
+
+    config.project_id = Some(id);
 
     let p = get_path()?;
     write_config(&config, &p)?;
