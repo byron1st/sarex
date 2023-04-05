@@ -1,7 +1,7 @@
 use super::{config, model::*};
 use clap::{Parser, Subcommand};
 use log::{error, info};
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, fs::OpenOptions, io::BufRead, io::BufReader, path::Path};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -40,7 +40,7 @@ enum Commands {
 
         #[arg(short, long)]
         /// A root package or directory of the target software
-        target: String,
+        source: String,
     },
 
     /// Extract connector instances from execution traces
@@ -70,6 +70,7 @@ enum Commands {
 enum CmdError {
     NotEnoughArguments,
     NoSuchProject,
+    NoSuchFile,
 }
 
 impl Error for CmdError {}
@@ -79,6 +80,7 @@ impl Display for CmdError {
         match self {
             CmdError::NotEnoughArguments => write!(f, "Not enough arguments"),
             CmdError::NoSuchProject => write!(f, "No such project"),
+            CmdError::NoSuchFile => write!(f, "No such file"),
         }
     }
 }
@@ -97,10 +99,7 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
         Some(Commands::SetDB { db_url }) => set_db(db_url).await,
         Some(Commands::GetDB {}) => get_db().await,
         Some(Commands::SetProject { project_id, name }) => set_project(project_id, name).await,
-        Some(Commands::Dr { file, target }) => {
-            info!("file: {}, target: {}", file, target);
-            Ok(())
-        }
+        Some(Commands::Dr { file, source }) => filter_drs(file, source).await,
         Some(Commands::Ci {
             execution_traces,
             output_file,
@@ -204,4 +203,31 @@ async fn set_project(
     config::write(&config)?;
 
     Ok(())
+}
+
+async fn filter_drs(file: String, source: String) -> Result<(), Box<dyn Error>> {
+    let p = Path::new(&file);
+    if !Path::exists(p) {
+        return Err(Box::new(CmdError::NoSuchFile));
+    }
+
+    let config = config::read()?;
+    let file = OpenOptions::new().read(true).open(p)?;
+    let reader = BufReader::new(file);
+
+    let mut drs: Vec<drs::Dr> = Vec::new();
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            match serde_json::from_str::<drs::Dr>(&line) {
+                Ok(dr) => {
+                    if !dr.target.starts_with(&source) && dr.source.starts_with(&source) {
+                        drs.push(dr);
+                    }
+                }
+                Err(e) => return Err(Box::new(e)),
+            };
+        }
+    }
+
+    drs::create_many(&config.db_url, drs).await
 }

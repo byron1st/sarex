@@ -14,6 +14,14 @@ pub struct Dr {
     pub target: String,
 }
 
+pub async fn create_many(url: &str, drs: Vec<Dr>) -> Result<(), Box<dyn Error>> {
+    let collection = get_drs_col(url).await?;
+
+    collection.insert_many(drs, None).await?;
+
+    Ok(())
+}
+
 async fn get_drs_col(url: &str) -> Result<Collection<Dr>, Box<dyn Error>> {
     let client = get_mongo_client(url).await?;
     let db = get_default_db(&client)?;
