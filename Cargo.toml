@@ -8,9 +8,12 @@ description = "Tools for the SARex method"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bson = { version = "2.6.1", features = ["chrono-0_4"] }
+chrono = "0.4.24"
 clap = { version = "4.2.1", features = ["derive"] }
 dirs = "5.0.0"
 env_logger = "0.10.0"
+futures = "0.3.28"
 log = "0.4.17"
 mongodb = "2.4.0"
 serde = { version = "1.0.159", features = ["derive"] }

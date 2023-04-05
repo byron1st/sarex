@@ -27,6 +27,7 @@ enum Commands {
         /// The project ID. If the project ID is not provided, a new project is created.
         project_id: Option<String>,
 
+        #[arg(short, long)]
         /// The project name. If the project ID is not provided, the project name is used to create a new project. If the project name is provided, the project name is set to the project.
         name: Option<String>,
     },
@@ -77,8 +78,8 @@ pub async fn init_app() {
 async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
     match cmd {
         Some(Commands::SetDB { db_url }) => set_db(db_url).await,
-        Some(Commands::GetDB {}) => get_db(),
-        Some(Commands::SetProject { project_id, name }) => set_project(project_id, name),
+        Some(Commands::GetDB {}) => get_db().await,
+        Some(Commands::SetProject { project_id, name }) => set_project(project_id, name).await,
         Some(Commands::Dr { file, target }) => {
             info!("file: {}, target: {}", file, target);
             Ok(())
