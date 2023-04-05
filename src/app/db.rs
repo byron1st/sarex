@@ -1,5 +1,6 @@
-use super::mongo::{
-    create_new_project, get_mongo_client, read_project_by_id, read_projects, update_project_name,
+use super::{
+    model::mongo::get_mongo_client,
+    model::projects::{create_new_project, read_project_by_id, read_projects, update_project_name},
 };
 use serde::{Deserialize, Serialize};
 use serde_json;
