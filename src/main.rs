@@ -1,6 +1,9 @@
-use app::cmd::init_app;
+use cmd::init_app;
 use env_logger::Env;
-mod app;
+
+mod cmd;
+mod config;
+mod model;
 
 #[tokio::main]
 async fn main() {
