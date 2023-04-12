@@ -4,6 +4,7 @@ use env_logger::Env;
 mod cmd;
 mod config;
 mod model;
+mod plugin;
 
 #[tokio::main]
 async fn main() {

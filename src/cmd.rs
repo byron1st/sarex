@@ -1,7 +1,8 @@
 use super::{config, model::*};
+use crate::{model::drs::Dr, plugin};
 use clap::{Parser, Subcommand};
 use log::{error, info};
-use std::{error::Error, fmt::Display, fs::OpenOptions, io::BufRead, io::BufReader, path::Path};
+use std::{error::Error, fmt::Display};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -35,11 +36,15 @@ enum Commands {
     /// Filter dependency relations from source code to external libraries
     Dr {
         #[arg(short, long)]
-        /// A file path that contains all dependency relations
-        file: String,
+        /// A root path for the target software
+        root_path: String,
 
         #[arg(short, long)]
-        /// A root package or directory of the target software
+        /// A programming language of the target software. Currently, only "java", "go", and "js" are supported.
+        lang: String,
+
+        #[arg(short, long)]
+        /// Packages or directories of the target software. Comma separated values are allowed.
         source: String,
     },
 
@@ -70,7 +75,8 @@ enum Commands {
 enum CmdError {
     NotEnoughArguments,
     NoSuchProject,
-    NoSuchFile,
+    WrongArguments,
+    NoProjectIdSet,
 }
 
 impl Error for CmdError {}
@@ -80,7 +86,8 @@ impl Display for CmdError {
         match self {
             CmdError::NotEnoughArguments => write!(f, "Not enough arguments"),
             CmdError::NoSuchProject => write!(f, "No such project"),
-            CmdError::NoSuchFile => write!(f, "No such file"),
+            CmdError::WrongArguments => write!(f, "Wrong arguments"),
+            CmdError::NoProjectIdSet => write!(f, "No project ID is set"),
         }
     }
 }
@@ -99,7 +106,11 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
         Some(Commands::SetDB { db_url }) => set_db(db_url).await,
         Some(Commands::GetDB {}) => get_db().await,
         Some(Commands::SetProject { project_id, name }) => set_project(project_id, name).await,
-        Some(Commands::Dr { file, source }) => filter_drs(file, source).await,
+        Some(Commands::Dr {
+            root_path,
+            lang,
+            source,
+        }) => save_drs(root_path, lang, source).await,
         Some(Commands::Ci {
             execution_traces,
             output_file,
@@ -205,29 +216,58 @@ async fn set_project(
     Ok(())
 }
 
-async fn filter_drs(file: String, source: String) -> Result<(), Box<dyn Error>> {
-    let p = Path::new(&file);
-    if !Path::exists(p) {
-        return Err(Box::new(CmdError::NoSuchFile));
+async fn save_drs(root_path: String, lang: String, sources: String) -> Result<(), Box<dyn Error>> {
+    let config = config::read()?;
+    let project_id = match config.project_id {
+        Some(id) => id,
+        None => {
+            return Err(Box::new(CmdError::NoProjectIdSet));
+        }
+    };
+
+    let all_drs = read_all_drs(lang, root_path, project_id)?;
+    if all_drs.len() == 0 {
+        info!("No drs found");
+        return Ok(());
     }
 
-    let config = config::read()?;
-    let file = OpenOptions::new().read(true).open(p)?;
-    let reader = BufReader::new(file);
+    let s = sources.split(",").collect::<Vec<_>>();
 
-    let mut drs: Vec<drs::Dr> = Vec::new();
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            match serde_json::from_str::<drs::Dr>(&line) {
-                Ok(dr) => {
-                    if !dr.target.starts_with(&source) && dr.source.starts_with(&source) {
-                        drs.push(dr);
-                    }
-                }
-                Err(e) => return Err(Box::new(e)),
-            };
+    let filtered_drs = all_drs
+        .iter()
+        .filter(|dr| !is_start_with(&dr.target, &s) && is_start_with(&dr.source, &s))
+        .collect::<Vec<_>>();
+
+    match drs::create_many(&config.db_url, filtered_drs).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+fn read_all_drs(
+    lang: String,
+    root_path: String,
+    project_id: String,
+) -> Result<Vec<Dr>, Box<dyn Error>> {
+    let kind: plugin::PluginKind = match lang.as_str() {
+        "java" => plugin::PluginKind::Java,
+        "go" => plugin::PluginKind::Go,
+        "js" => plugin::PluginKind::JavaScript,
+        _ => return Err(Box::new(CmdError::WrongArguments)),
+    };
+
+    let mut params = Vec::new();
+    params.push(root_path);
+
+    plugin::read_drs(project_id, kind, params)
+}
+
+fn is_start_with(item: &String, sources: &Vec<&str>) -> bool {
+    for source in sources {
+        if item.starts_with(source) {
+            return true;
         }
     }
 
-    drs::create_many(&config.db_url, drs).await
+    false
 }

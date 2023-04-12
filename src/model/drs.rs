@@ -12,9 +12,12 @@ pub struct Dr {
     pub id: Option<ObjectId>,
     pub source: String,
     pub target: String,
+
+    #[serde(rename = "projectId")]
+    pub project_id: String,
 }
 
-pub async fn create_many(url: &str, drs: Vec<Dr>) -> Result<(), Box<dyn Error>> {
+pub async fn create_many(url: &str, drs: Vec<&Dr>) -> Result<(), Box<dyn Error>> {
     let collection = get_drs_col(url).await?;
 
     collection.insert_many(drs, None).await?;
