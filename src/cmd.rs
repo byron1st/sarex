@@ -114,13 +114,7 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
         Some(Commands::Ci {
             execution_traces,
             output_file,
-        }) => {
-            info!(
-                "execution_traces: {}, output_file: {}",
-                execution_traces, output_file
-            );
-            Ok(())
-        }
+        }) => extract_cis(execution_traces, output_file).await,
         Some(Commands::Conn {
             ci_file,
             output_file,
@@ -270,4 +264,19 @@ fn is_start_with(item: &String, sources: &Vec<&str>) -> bool {
     }
 
     false
+}
+
+// execution trace
+
+struct ExecutionTrace {
+    pub id: String, // <MappingRuleId,Procedure,Index>
+}
+
+async fn extract_cis(execution_traces: String, output_file: String) -> Result<(), Box<dyn Error>> {
+    info!(
+        "execution_traces: {}, output_file: {}",
+        execution_traces, output_file
+    );
+
+    Ok(())
 }

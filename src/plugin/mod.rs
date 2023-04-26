@@ -1,6 +1,7 @@
 use crate::model::drs::Dr;
 use std::error::Error;
 
+mod dir;
 mod java;
 
 pub enum PluginKind {
