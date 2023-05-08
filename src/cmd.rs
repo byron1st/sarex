@@ -1,8 +1,13 @@
 use super::{config, model::*};
-use crate::{model::drs::Dr, plugin};
+use crate::{
+    ci,
+    model::{self, drs::Dr},
+    plugin,
+};
 use clap::{Parser, Subcommand};
 use log::{error, info};
-use std::{error::Error, fmt::Display};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, error::Error, fmt::Display};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -268,15 +273,28 @@ fn is_start_with(item: &String, sources: &Vec<&str>) -> bool {
 
 // execution trace
 
+#[derive(Serialize, Deserialize, Debug)]
 struct ExecutionTrace {
     pub id: String, // <MappingRuleId,Procedure,Index>
+
+    #[serde(rename = "sourceValues")]
+    pub source_values: HashMap<String, String>,
+
+    #[serde(rename = "targetValues")]
+    pub target_values: HashMap<String, String>,
 }
 
-async fn extract_cis(execution_traces: String, output_file: String) -> Result<(), Box<dyn Error>> {
-    info!(
-        "execution_traces: {}, output_file: {}",
-        execution_traces, output_file
-    );
+async fn extract_cis(
+    execution_traces_file_path_str: String,
+    output_file_path_str: String,
+) -> Result<(), Box<dyn Error>> {
+    let config = config::read()?;
+    let project_id = config.project_id.ok_or(CmdError::NoProjectIdSet)?;
 
-    Ok(())
+    let execution_traces = ci::read_execution_traces(execution_traces_file_path_str)?;
+    let mapping_rules = model::mapping_rules::read_many(&config.db_url, &project_id).await?;
+
+    let cis = ci::create_cis(execution_traces, mapping_rules)?;
+
+    ci::write_cis(cis, &output_file_path_str)
 }

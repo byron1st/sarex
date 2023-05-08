@@ -1,0 +1,5 @@
+{"id":"644929ee7d64118ac04d8220_subscriber/template/control/gui/ControlConsole.\u003cinit\u003e(Lsubscriber/EBAbstractSubscriber;)V_0","sourceValues":{"process_id":"10012","registry_name":""},"targetValues":{"file_path":"logo_nipa.jpg"}}
+{"id":"644929b37d64118ac04d821f_subscriber/EBAbstractSubscriber.register()Ljava/lang/Integer;_1","sourceValues":{"process_id":"10012","file_path":""},"targetValues":{"registry_name":"Event_Bus"}}
+{"id":"644929b37d64118ac04d821f_subscriber/EBAbstractSubscriber.register()Ljava/lang/Integer;_0","sourceValues":{"process_id":"10014","file_path":""},"targetValues":{"registry_name":"Event_Bus"}}
+{"id":"644929b37d64118ac04d821f_subscriber/EBAbstractSubscriber.register()Ljava/lang/Integer;_0","sourceValues":{"process_id":"10016","file_path":""},"targetValues":{"registry_name":"Event_Bus"}}
+{"id":"644929b37d64118ac04d821f_subscriber/EBAbstractSubscriber.register()Ljava/lang/Integer;_0","sourceValues":{"process_id":"10018","file_path":""},"targetValues":{"registry_name":"Event_Bus"}}
