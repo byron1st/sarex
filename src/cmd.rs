@@ -1,13 +1,13 @@
 use super::{config, model::*};
 use crate::{
-    ci,
+    ci, conn,
     model::{self, drs::Dr},
     plugin,
 };
 use clap::{Parser, Subcommand};
 use log::{error, info};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, error::Error, fmt::Display};
+
+use std::{error::Error, fmt::Display};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -73,6 +73,10 @@ enum Commands {
         #[arg(short, long)]
         /// An output file path that contains an execution view model
         output_file: String,
+
+        #[arg(short, long)]
+        /// An output format of the execution view model. Currently, "json", "png", and "dot" are supported.
+        format: String,
     },
 }
 
@@ -123,10 +127,8 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
         Some(Commands::Conn {
             ci_file,
             output_file,
-        }) => {
-            info!("file: {}, target: {}", ci_file, output_file);
-            Ok(())
-        }
+            format,
+        }) => build_connectors(ci_file, output_file, format),
         None => {
             error!("No command provided");
             Ok(())
@@ -271,19 +273,6 @@ fn is_start_with(item: &String, sources: &Vec<&str>) -> bool {
     false
 }
 
-// execution trace
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ExecutionTrace {
-    pub id: String, // <MappingRuleId,Procedure,Index>
-
-    #[serde(rename = "sourceValues")]
-    pub source_values: HashMap<String, String>,
-
-    #[serde(rename = "targetValues")]
-    pub target_values: HashMap<String, String>,
-}
-
 async fn extract_cis(
     execution_traces_file_path_str: String,
     output_file_path_str: String,
@@ -297,4 +286,14 @@ async fn extract_cis(
     let cis = ci::create_cis(execution_traces, mapping_rules)?;
 
     ci::write_cis(cis, &output_file_path_str)
+}
+
+fn build_connectors(
+    ci_file: String,
+    output_file: String,
+    output_format: String,
+) -> Result<(), Box<dyn Error>> {
+    let cis = conn::read_cis(&ci_file)?;
+    let model = conn::build_model(cis)?;
+    conn::write_model(model, &output_file, &output_format)
 }

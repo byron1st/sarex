@@ -6,6 +6,7 @@ mod config;
 mod model;
 mod plugin;
 mod ci;
+mod conn;
 
 #[tokio::main]
 async fn main() {

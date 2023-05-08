@@ -42,6 +42,7 @@ pub struct Ci {
     pub id: String,
     pub connector_type: String,
     pub source_component_values: HashMap<String, String>,
+    pub additional_source_component_values: HashMap<String, String>,
     pub target_component_values: HashMap<String, String>,
 }
 
@@ -56,26 +57,27 @@ pub fn create_cis(
 
         // 모든 Source Value 들을 기록해두어야, 나중에 찾을 수 있음 (execution context)
         let mut source_component_values: HashMap<String, String> = HashMap::new();
+        let mut additional_source_component_values: HashMap<String, String> = HashMap::new();
         for (key, value) in execution_trace.source_values {
-            source_component_values.insert(key, value);
+            if value != "" {
+                if mapping_rule
+                    .source_component_identifier_schema
+                    .contains(&key)
+                {
+                    source_component_values.insert(key, value);
+                } else {
+                    additional_source_component_values.insert(key, value);
+                }
+            }
         }
-        // TODO: 이건 아닌거 같음 -> 논문 수정 필요
-        // for identifier in mapping_rule.source_component_identifier_schema {
-        //     let value = execution_trace.source_values.get(&identifier);
-        //     if let Some(value) = value {
-        //         sourceComponentValues.insert(identifier, value.clone());
-        //     } else {
-        //         sourceComponentValues.insert(identifier, "".to_string());
-        //     }
-        // }
 
         let mut target_component_values: HashMap<String, String> = HashMap::new();
         for identifier in mapping_rule.target_component_identifier_schema {
             let value = execution_trace.target_values.get(&identifier);
             if let Some(value) = value {
-                target_component_values.insert(identifier, value.clone());
-            } else {
-                target_component_values.insert(identifier, "".to_string());
+                if value != "" {
+                    target_component_values.insert(identifier, value.clone());
+                }
             }
         }
 
@@ -83,6 +85,7 @@ pub fn create_cis(
             id: execution_trace.id.clone(),
             connector_type: mapping_rule.connector_type.clone(),
             source_component_values,
+            additional_source_component_values,
             target_component_values,
         };
 
