@@ -33,8 +33,8 @@ struct DrRecord {
     callee: String,
 }
 
-pub fn read_drs(project_id: &str, params: Vec<String>) -> Result<Vec<Dr>, Box<dyn Error>> {
-    if params.len() != 1 {
+pub fn read_drs(project_id: &str, params: Vec<&str>) -> Result<Vec<Dr>, Box<dyn Error>> {
+    if params.len() < 1 {
         return Err(Box::new(PluginError::WrongArguments));
     }
 
@@ -44,7 +44,7 @@ pub fn read_drs(project_id: &str, params: Vec<String>) -> Result<Vec<Dr>, Box<dy
     let output = Command::new("java")
         .arg("-jar")
         .arg(jar_file)
-        .arg(&params[0])
+        .arg(params[0])
         .output()?;
     let result = String::from_utf8_lossy(&output.stdout);
 
@@ -66,13 +66,13 @@ pub fn read_drs(project_id: &str, params: Vec<String>) -> Result<Vec<Dr>, Box<dy
     Ok(drs)
 }
 
-fn get_jar_file() -> Result<String, Box<dyn Error>> {
+fn get_jar_file() -> Result<String, PluginError> {
     let mut p = dir::get_plugin_dir();
     p.push(PLUGIN_DIR);
     p.push(JAR_FILE);
 
     match p.to_str() {
         Some(j) => Ok(j.to_string()),
-        None => Err(Box::new(PluginError::NoJavaDependencyReaderInstalled)),
+        None => Err(PluginError::NoJavaDependencyReaderInstalled),
     }
 }

@@ -50,7 +50,7 @@ enum Commands {
 
         #[arg(short, long)]
         /// Packages or directories of the target software. Comma separated values are allowed.
-        source: String,
+        sources: String,
     },
 
     /// Extract connector instances from execution traces
@@ -118,8 +118,8 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
         Some(Commands::Dr {
             root_path,
             lang,
-            source,
-        }) => save_drs(root_path, lang, source).await,
+            sources,
+        }) => save_drs(root_path, lang, sources).await,
         Some(Commands::Ci {
             execution_traces,
             output_file,
@@ -226,7 +226,18 @@ async fn save_drs(root_path: String, lang: String, sources: String) -> Result<()
         }
     };
 
-    let all_drs = read_all_drs(lang, root_path, project_id)?;
+    let kind: plugin::PluginKind = match lang.as_str() {
+        "java" => plugin::PluginKind::Java,
+        "go" => plugin::PluginKind::Go,
+        "js" => plugin::PluginKind::JavaScript,
+        _ => return Err(Box::new(CmdError::WrongArguments)),
+    };
+
+    let mut params: Vec<&str> = Vec::new();
+    params.push(&root_path);
+    params.push(&sources);
+
+    let all_drs = plugin::read_drs(&project_id, kind, params)?;
     if all_drs.len() == 0 {
         info!("No drs found");
         return Ok(());
@@ -243,24 +254,6 @@ async fn save_drs(root_path: String, lang: String, sources: String) -> Result<()
         Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
-}
-
-fn read_all_drs(
-    lang: String,
-    root_path: String,
-    project_id: String,
-) -> Result<Vec<Dr>, Box<dyn Error>> {
-    let kind: plugin::PluginKind = match lang.as_str() {
-        "java" => plugin::PluginKind::Java,
-        "go" => plugin::PluginKind::Go,
-        "js" => plugin::PluginKind::JavaScript,
-        _ => return Err(Box::new(CmdError::WrongArguments)),
-    };
-
-    let mut params = Vec::new();
-    params.push(root_path);
-
-    plugin::read_drs(project_id, kind, params)
 }
 
 fn is_start_with(item: &String, sources: &Vec<&str>) -> bool {

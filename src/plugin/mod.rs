@@ -2,6 +2,7 @@ use crate::model::drs::Dr;
 use std::error::Error;
 
 mod dir;
+mod go;
 mod java;
 
 pub enum PluginKind {
@@ -11,13 +12,13 @@ pub enum PluginKind {
 }
 
 pub fn read_drs(
-    project_id: String,
+    project_id: &str,
     kind: PluginKind,
-    params: Vec<String>,
+    params: Vec<&str>,
 ) -> Result<Vec<Dr>, Box<dyn Error>> {
     match kind {
-        PluginKind::Java => java::read_drs(&project_id, params),
-        PluginKind::Go => Ok(Vec::new()),
+        PluginKind::Java => java::read_drs(project_id, params),
+        PluginKind::Go => go::read_drs(project_id, params),
         PluginKind::JavaScript => Ok(Vec::new()),
     }
 }
