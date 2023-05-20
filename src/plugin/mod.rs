@@ -4,6 +4,7 @@ use std::error::Error;
 mod dir;
 mod go;
 mod java;
+mod js;
 
 pub enum PluginKind {
     Java,
@@ -19,6 +20,6 @@ pub fn read_drs(
     match kind {
         PluginKind::Java => java::read_drs(project_id, params),
         PluginKind::Go => go::read_drs(project_id, params),
-        PluginKind::JavaScript => Ok(Vec::new()),
+        PluginKind::JavaScript => js::read_drs(project_id, params),
     }
 }

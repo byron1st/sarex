@@ -9,8 +9,7 @@ use super::dir;
 #[derive(Debug)]
 enum PluginError {
     WrongArguments,
-    NoGoFileInstalled,
-    CommandError(std::io::Error),
+    NoJSDependencyReaderInstalled,
 }
 
 impl Error for PluginError {}
@@ -19,14 +18,15 @@ impl Display for PluginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PluginError::WrongArguments => write!(f, "Wrong arguments"),
-            PluginError::NoGoFileInstalled => write!(f, "No Go file installed"),
-            PluginError::CommandError(e) => write!(f, "Command error: {}", e),
+            PluginError::NoJSDependencyReaderInstalled => {
+                write!(f, "No Java dependency reader installed")
+            }
         }
     }
 }
 
-const PLUGIN_DIR: &str = "go";
-const GO_FILE: &str = "go-dependencies-reader";
+const PLUGIN_DIR: &str = "js";
+const PROJECT_DIR: &str = "js-dependencies-reader";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct DrRecord {
@@ -35,24 +35,17 @@ struct DrRecord {
 }
 
 pub fn read_drs(project_id: &str, params: Vec<&str>) -> Result<Vec<Dr>, Box<dyn Error>> {
-    if params.len() < 3 || params[2] == "" {
+    if params.len() < 1 {
         return Err(Box::new(PluginError::WrongArguments));
     }
 
-    let root_path = params[0];
-    let pkg = params[2];
+    let plugin_program_dir = get_reader_dir()?;
+    println!("{}", plugin_program_dir);
 
-    let go_file = get_go_file()?;
-    let output = match Command::new(go_file)
-        .current_dir(root_path)
-        .arg("-main")
-        .arg(pkg)
-        .output()
-    {
-        Ok(o) => o,
-        Err(e) => return Err(Box::new(PluginError::CommandError(e))),
-    };
-
+    let output = Command::new("./run.sh")
+        .env("ROOT", params[0])
+        .current_dir(plugin_program_dir)
+        .output()?;
     let result = String::from_utf8_lossy(&output.stdout);
 
     let mut drs = Vec::new();
@@ -73,13 +66,13 @@ pub fn read_drs(project_id: &str, params: Vec<&str>) -> Result<Vec<Dr>, Box<dyn 
     Ok(drs)
 }
 
-fn get_go_file() -> Result<String, PluginError> {
+fn get_reader_dir() -> Result<String, PluginError> {
     let mut p = dir::get_plugin_dir();
     p.push(PLUGIN_DIR);
-    p.push(GO_FILE);
+    p.push(PROJECT_DIR);
 
     match p.to_str() {
-        Some(g) => Ok(String::from(g)),
-        None => Err(PluginError::NoGoFileInstalled),
+        Some(j) => Ok(j.to_string()),
+        None => Err(PluginError::NoJSDependencyReaderInstalled),
     }
 }
