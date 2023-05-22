@@ -51,10 +51,6 @@ enum Commands {
         #[arg(short, long)]
         /// Packages or directories of the target software. Comma separated values are allowed.
         sources: String,
-
-        #[arg(short, long)]
-        /// The package of the target software. Only Go required.
-        target_pkg: Option<String>,
     },
 
     /// Extract connector instances from execution traces
@@ -123,8 +119,7 @@ async fn run_command(cmd: Option<Commands>) -> Result<(), Box<dyn Error>> {
             root_path,
             lang,
             sources,
-            target_pkg,
-        }) => save_drs(root_path, lang, sources, target_pkg).await,
+        }) => save_drs(root_path, lang, sources).await,
         Some(Commands::Ci {
             execution_traces,
             output_file,
@@ -222,12 +217,7 @@ async fn set_project(
     Ok(())
 }
 
-async fn save_drs(
-    root_path: String,
-    lang: String,
-    sources: String,
-    target_pkg: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+async fn save_drs(root_path: String, lang: String, sources: String) -> Result<(), Box<dyn Error>> {
     let config = config::read()?;
     let project_id = match config.project_id {
         Some(id) => id,
@@ -246,12 +236,6 @@ async fn save_drs(
     let mut params: Vec<&str> = Vec::new();
     params.push(&root_path);
     params.push(&sources);
-
-    let target_pkg_str = match &target_pkg {
-        Some(pkg) => pkg,
-        None => "",
-    };
-    params.push(&target_pkg_str);
 
     let all_drs = plugin::read_drs(&project_id, kind, params)?;
     if all_drs.len() == 0 {

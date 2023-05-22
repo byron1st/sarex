@@ -40,7 +40,6 @@ pub fn read_drs(project_id: &str, params: Vec<&str>) -> Result<Vec<Dr>, Box<dyn 
     }
 
     let plugin_program_dir = get_reader_dir()?;
-    println!("{}", plugin_program_dir);
 
     let output = Command::new("./run.sh")
         .env("ROOT", params[0])

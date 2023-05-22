@@ -35,18 +35,19 @@ struct DrRecord {
 }
 
 pub fn read_drs(project_id: &str, params: Vec<&str>) -> Result<Vec<Dr>, Box<dyn Error>> {
-    if params.len() < 3 || params[2] == "" {
+    if params.len() < 2 {
         return Err(Box::new(PluginError::WrongArguments));
     }
 
     let root_path = params[0];
-    let pkg = params[2];
+    let pkg = params[1];
 
     let go_file = get_go_file()?;
     let output = match Command::new(go_file)
-        .current_dir(root_path)
         .arg("-main")
         .arg(pkg)
+        .arg("-dir")
+        .arg(root_path)
         .output()
     {
         Ok(o) => o,
