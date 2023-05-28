@@ -3,12 +3,13 @@ use std::{
     error::Error,
     fs::OpenOptions,
     io::{BufReader, Write},
+    iter,
     path::Path,
 };
 
 use graphviz_rust::{cmd::CommandArg, dot_structures::*, printer::DotPrinter};
 use graphviz_rust::{cmd::Format, dot_generator::*, exec, printer::PrinterContext};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::ci::Ci;
@@ -35,6 +36,19 @@ impl Model {
             components: Vec::new(),
         }
     }
+
+    fn has_connector(&self, connector: &Connector) -> bool {
+        for c in &self.connectors {
+            if c.connector_type == connector.connector_type
+                && c.source_component_id == connector.source_component_id
+                && c.target_component_id == connector.target_component_id
+            {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,15 +67,21 @@ pub struct Component {
 pub fn build_model(cis: Vec<Ci>) -> Result<Model, Box<dyn Error>> {
     let mut model = Model::new();
 
+    for ci in &cis {
+        // Create source components first.
+        find_or_create_component_if_not_exist(&mut model, ci, true);
+    }
+
     for ci in cis {
         let source_component_id = find_or_create_component_if_not_exist(&mut model, &ci, true);
         let target_component_id = find_or_create_component_if_not_exist(&mut model, &ci, false);
-        let connector = Connector {
-            connector_type: ci.connector_type,
+
+        create_connector_if_not_exist(
+            &mut model,
+            ci.connector_type,
             source_component_id,
             target_component_id,
-        };
-        model.connectors.push(connector);
+        );
     }
 
     Ok(model)
@@ -74,15 +94,16 @@ fn find_or_create_component_if_not_exist(model: &mut Model, ci: &Ci, is_source: 
         &ci.target_component_values
     };
 
-    let source_component_id = find_component_in_model(&model, component_values);
-    if let Some(source_component) = source_component_id {
-        source_component
+    let component_id = find_component_in_model(model, component_values);
+    if let Some(component) = component_id {
+        component
     } else {
         let new_component_id = get_random_id(10);
-        let mut new_component_values = component_values.clone();
-        if is_source {
-            new_component_values.extend(ci.additional_source_component_values.clone());
-        }
+        let new_component_values = component_values.clone();
+        // let mut new_component_values = component_values.clone();
+        // if is_source {
+        //     new_component_values.extend(ci.additional_source_component_values.clone());
+        // }
 
         model.components.push(Component {
             id: new_component_id.clone(),
@@ -94,18 +115,40 @@ fn find_or_create_component_if_not_exist(model: &mut Model, ci: &Ci, is_source: 
 }
 
 fn find_component_in_model(
-    model: &Model,
+    model: &mut Model,
     component_values: &HashMap<String, String>,
 ) -> Option<String> {
-    for component in &model.components {
+    for component in &mut model.components {
+        let is_component_large = component.component_values.len() > component_values.len();
+        let (large_values, small_values) = if is_component_large {
+            (&component.component_values, component_values)
+        } else {
+            (component_values, &component.component_values)
+        };
+
         let mut is_same = true;
-        for (identifier, value) in component_values {
-            if value != "" {
-                let component_value = component.component_values.get(identifier);
-                is_same = is_same && component_value == Some(&value);
+        for (identifier, value) in small_values {
+            if !value.is_empty() {
+                let component_value: Option<&String> = large_values.get(identifier);
+                is_same = is_same && component_value == Some(value);
             }
         }
+
         if is_same {
+            if !is_component_large {
+                for (identifier, value) in component_values {
+                    if !value.is_empty() {
+                        let component_value: Option<&String> =
+                            component.component_values.get(identifier);
+                        if component_value.is_none() {
+                            component
+                                .component_values
+                                .insert(identifier.clone(), value.clone());
+                        }
+                    }
+                }
+            }
+
             return Some(component.id.clone());
         }
     }
@@ -114,11 +157,27 @@ fn find_component_in_model(
 }
 
 fn get_random_id(len: usize) -> String {
-    thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect()
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut rng = rand::thread_rng();
+    let one_char = || CHARSET[rng.gen_range(0..CHARSET.len())] as char;
+    iter::repeat_with(one_char).take(len).collect()
+}
+
+fn create_connector_if_not_exist(
+    model: &mut Model,
+    connector_type: String,
+    source_component_id: String,
+    target_component_id: String,
+) {
+    let new_connector = Connector {
+        connector_type,
+        source_component_id,
+        target_component_id,
+    };
+
+    if !model.has_connector(&new_connector) {
+        model.connectors.push(new_connector);
+    }
 }
 
 pub fn write_model(
@@ -180,7 +239,8 @@ fn get_dot_graph(model: Model) -> Graph {
     }
 
     for connector in model.connectors {
-        let edge = edge!(node_id!(connector.source_component_id) => node_id!(connector.target_component_id);attr!("label", &connector.connector_type));
+        let label = get_edge_label(&connector.connector_type);
+        let edge = edge!(node_id!(connector.source_component_id) => node_id!(connector.target_component_id);attr!("label", &label));
         g.add_stmt(stmt!(edge));
     }
 
@@ -190,11 +250,15 @@ fn get_dot_graph(model: Model) -> Graph {
 fn get_node_label(component_values: &HashMap<String, String>) -> String {
     let mut label: String = String::from("\"");
     for (identifier, value) in component_values {
-        if value != "" {
+        if !value.is_empty() {
             label.push_str(format!("{}:{}\\n", &identifier, &value).as_str());
         }
     }
-    label.push_str("\"");
+    label.push('\"');
 
     label
+}
+
+fn get_edge_label(connector_type: &str) -> String {
+    format!("\"{}\"", connector_type)
 }

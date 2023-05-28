@@ -27,11 +27,14 @@ pub fn read_execution_traces(file_path_str: String) -> Result<Vec<ExecutionTrace
     let execution_traces_file = OpenOptions::new().read(true).open(file_path)?;
     let reader = BufReader::new(execution_traces_file);
     let mut execution_traces: Vec<ExecutionTrace> = Vec::new();
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let execution_trace: ExecutionTrace = serde_json::from_str(&line)?;
-            execution_traces.push(execution_trace);
-        }
+    for line in reader.lines().flatten() {
+        let execution_trace: ExecutionTrace = match serde_json::from_str(&line) {
+            Ok(execution_trace) => execution_trace,
+            Err(_) => {
+                continue;
+            }
+        };
+        execution_traces.push(execution_trace);
     }
 
     Ok(execution_traces)
@@ -42,7 +45,7 @@ pub struct Ci {
     pub id: String,
     pub connector_type: String,
     pub source_component_values: HashMap<String, String>,
-    pub additional_source_component_values: HashMap<String, String>,
+    // pub additional_source_component_values: HashMap<String, String>,
     pub target_component_values: HashMap<String, String>,
 }
 
@@ -57,17 +60,9 @@ pub fn create_cis(
 
         // 모든 Source Value 들을 기록해두어야, 나중에 찾을 수 있음 (execution context)
         let mut source_component_values: HashMap<String, String> = HashMap::new();
-        let mut additional_source_component_values: HashMap<String, String> = HashMap::new();
         for (key, value) in execution_trace.source_values {
-            if value != "" {
-                if mapping_rule
-                    .source_component_identifier_schema
-                    .contains(&key)
-                {
-                    source_component_values.insert(key, value);
-                } else {
-                    additional_source_component_values.insert(key, value);
-                }
+            if !value.is_empty() {
+                source_component_values.insert(key, value);
             }
         }
 
@@ -75,7 +70,7 @@ pub fn create_cis(
         for identifier in mapping_rule.target_component_identifier_schema {
             let value = execution_trace.target_values.get(&identifier);
             if let Some(value) = value {
-                if value != "" {
+                if !value.is_empty() {
                     target_component_values.insert(identifier, value.clone());
                 }
             }
@@ -85,7 +80,7 @@ pub fn create_cis(
             id: execution_trace.id.clone(),
             connector_type: mapping_rule.connector_type.clone(),
             source_component_values,
-            additional_source_component_values,
+            // additional_source_component_values,
             target_component_values,
         };
 
@@ -96,7 +91,7 @@ pub fn create_cis(
 }
 
 fn find_corresponding_mapping_rule(
-    mapping_rules: &Vec<MappingRule>,
+    mapping_rules: &[MappingRule],
     execution_trace_id: &str,
 ) -> Result<MappingRule, CIError> {
     let mapping_rule_id = get_mapping_rule_id(execution_trace_id)?;
@@ -104,9 +99,9 @@ fn find_corresponding_mapping_rule(
         .iter()
         .find(|mapping_rule| {
             if let Some(id) = mapping_rule.id {
-                return id.to_hex() == mapping_rule_id;
+                id.to_hex() == mapping_rule_id
             } else {
-                return false;
+                false
             }
         })
         .ok_or(CIError::NoCorrespondingMappingRule)?;
@@ -115,19 +110,18 @@ fn find_corresponding_mapping_rule(
 }
 
 fn get_mapping_rule_id(execution_trace_id: &str) -> Result<String, CIError> {
-    let split: Vec<&str> = execution_trace_id.split("_").collect();
-    if split.len() == 0 {
+    let split: Vec<&str> = execution_trace_id.split('_').collect();
+    if split.is_empty() {
         return Err(CIError::MalformedExecutionTraceId);
     }
 
-    return Ok(split[0].to_string());
+    Ok(split[0].to_string())
 }
 
 pub fn write_cis(cis: Vec<Ci>, output_file_path_str: &str) -> Result<(), Box<dyn Error>> {
     let p = Path::new(output_file_path_str);
     let mut file = OpenOptions::new().write(true).create(true).open(p)?;
-    file.write_all(serde_json::to_string(&cis)?.as_bytes())?;
-
+    file.write_all(serde_json::to_string_pretty(&cis)?.as_bytes())?;
     Ok(())
 }
 

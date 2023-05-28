@@ -153,7 +153,7 @@ async fn get_db() -> Result<(), Box<dyn Error>> {
 
     let mut s = String::new();
 
-    if config.db_url != "" {
+    if !config.db_url.is_empty() {
         s.push_str(&format!("db_url: {}\n", config.db_url));
     } else {
         s.push_str("db_url: <NOT SET>\n");
@@ -166,7 +166,7 @@ async fn get_db() -> Result<(), Box<dyn Error>> {
 
     s.push_str(&format!("project_id: {}\n", &project_id));
 
-    if config.db_url != "" {
+    if !config.db_url.is_empty() {
         let projects = projects::read_many(&config.db_url).await?;
 
         s.push_str("projects:\n");
@@ -183,7 +183,7 @@ async fn get_db() -> Result<(), Box<dyn Error>> {
                 checked,
                 id,
                 project.name,
-                created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                created_at.format("%Y-%m-%d %H:%M:%S"),
             ));
         }
     }
@@ -233,17 +233,15 @@ async fn save_drs(root_path: String, lang: String, sources: String) -> Result<()
         _ => return Err(Box::new(CmdError::WrongArguments)),
     };
 
-    let mut params: Vec<&str> = Vec::new();
-    params.push(&root_path);
-    params.push(&sources);
+    let params: Vec<&str> = vec![&root_path, &sources];
 
     let all_drs = plugin::read_drs(&project_id, kind, params)?;
-    if all_drs.len() == 0 {
+    if all_drs.is_empty() {
         info!("No drs found");
         return Ok(());
     }
 
-    let s = sources.split(",").collect::<Vec<_>>();
+    let s = sources.split(',').collect::<Vec<_>>();
 
     let filtered_drs = all_drs
         .iter()
@@ -256,7 +254,7 @@ async fn save_drs(root_path: String, lang: String, sources: String) -> Result<()
     }
 }
 
-fn is_start_with(item: &String, sources: &Vec<&str>) -> bool {
+fn is_start_with(item: &str, sources: &Vec<&str>) -> bool {
     for source in sources {
         if item.starts_with(source) {
             return true;
