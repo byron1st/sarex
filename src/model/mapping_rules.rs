@@ -33,7 +33,7 @@ pub struct MappingRule {
 impl Clone for MappingRule {
     fn clone(&self) -> Self {
         MappingRule {
-            id: self.id.clone(),
+            id: self.id,
             project_id: self.project_id.clone(),
             procedure: self.procedure.clone(),
             relation: self.relation.clone(),

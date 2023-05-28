@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json;
+
 use std::{
     error::Error,
     fs::{self, OpenOptions},

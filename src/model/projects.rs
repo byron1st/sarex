@@ -55,7 +55,7 @@ pub async fn read_one(url: &str, id: &str) -> Result<Option<Project>, Box<dyn Er
 
     match collection.find_one(filter, None).await {
         Ok(result) => Ok(result),
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => Err(Box::new(e)),
     }
 }
 

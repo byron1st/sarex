@@ -35,7 +35,7 @@ struct DrRecord {
 }
 
 pub fn read_drs(project_id: &str, params: Vec<&str>) -> Result<Vec<Dr>, Box<dyn Error>> {
-    if params.len() < 1 {
+    if params.is_empty() {
         return Err(Box::new(PluginError::WrongArguments));
     }
 
